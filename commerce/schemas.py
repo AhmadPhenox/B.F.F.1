@@ -24,6 +24,9 @@ class ProductOut(Schema):
     name: str
     description: str
     size: str
+    length: str
+    height: str
+    width: str
     qty: int
     price: int
     discounted_price: int
