@@ -1,3 +1,5 @@
+import random
+import string
 from typing import List
 
 from django.contrib.auth import get_user_model
@@ -6,7 +8,7 @@ from ninja import Router
 from pydantic import UUID4
 
 from account.authorization import GlobalAuth
-from commerce.models import Product, Label, Category, Item
+from commerce.models import Product, Label, Category, Item, Order, OrderStatus
 from commerce.schemas import ProductOut, LabelOut, CategoryOut, ProductCreate, AddToCartPayload
 from django.shortcuts import get_object_or_404
 
@@ -18,11 +20,11 @@ commerce_controller = Router(tags=['products'])
 order_controller = Router(tags=['order'])
 
 
-
 @commerce_controller.get('products', response={
     200: List[ProductOut],
 })
-def list_products(request, q: str = None, price_lte: int = None, price_gte: int = None):
+def list_products(request, q: str = None, price_lte: int = None, price_gte: int = None, Categorys: UUID4 = None,
+                  featuerd: bool = None, is_active: bool = None):
     products = Product.objects.all()
 
     if q:
@@ -35,6 +37,12 @@ def list_products(request, q: str = None, price_lte: int = None, price_gte: int 
 
     if price_gte:
         products = products.filter(discounted_price__gte=price_gte)
+    if Categorys:
+        products = products.filter(category_id=Categorys)
+    if featuerd is not None:
+        products = products.filter(is_featured=featuerd)
+    if is_active is not None:
+        products = products.filter(is_active=is_active)
 
     return products
 
@@ -60,7 +68,6 @@ def list_label(request):
 })
 def retrieve_Label(request, id):
     return get_object_or_404(Label, id=id)
-
 
 
 @commerce_controller.get('Categorys', response={
@@ -90,7 +97,6 @@ def create_product(request, payload: ProductCreate):
         return 400, {'detail': 'something wrong happened!'}
 
     return 201, product
-
 
 
 @order_controller.post('add-to-cart', auth=GlobalAuth(), response=MessageOut)
@@ -142,5 +148,46 @@ def delete_item(request, item_id: UUID4):
     return 200, {'detail': 'Item deleted !'}
 
 
+# @order_controller.post('create', auth=GlobalAuth(), response=MessageOut)
+# def create_order(request):
+#     user = get_object_or_404(User, id=request.auth['pk'])
+#     print('1')
+#     random_alpha = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+#     print('2')
+#     # order = Order.objects.create(user=user, ref_code=random_alpha,ordered=True)
+#     order = Order.objects.create(user=user, ref_code=random_alpha, ordered=True)
+#     print('3')
+#     order.total = order.order_total()
+#     print('4')
+#     order.save()
+#     print('5')
+#
+#     return 200, {'detail': 'orderd create successfully!'}
 
 
+def generate_ref_code():
+    return ''.join(random.sample(string.ascii_letters + string.digits, 6))
+
+
+@order_controller.post('create-order', auth=GlobalAuth(), response=MessageOut)
+def create_order(request):
+
+
+    order_qs = Order.objects.create(
+        user = get_object_or_404(User, id=request.auth['pk']),
+        # status=OrderStatus.objects.get(is_default=True),
+
+        ref_code=generate_ref_code(),
+        ordered=False,
+    )
+
+    # ordered_user_items = Item.objects.filter(user=get_object_or_404(User, id=request.auth['pk'])).filter(ordered=True)
+    # ordered_user_items.delete()
+    user_items = Item.objects.filter(user = get_object_or_404(User, id=request.auth['pk'])).filter(ordered=False)
+    user_items.delete(ordered=True)
+    order_qs.items.add(*user_items)
+    order_qs.total = order_qs.order_total
+    user_items.update(ordered=True)
+    order_qs.save()
+
+    return {'detail': 'order created successfully'}

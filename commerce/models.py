@@ -46,8 +46,8 @@ class Order(Entity):
     address = models.ForeignKey('Address', verbose_name='address', null=True, blank=True,
                                 on_delete=models.CASCADE)
     total = models.DecimalField('total', blank=True, null=True, max_digits=1000, decimal_places=0)
-    status = models.ForeignKey('commerce.OrderStatus', verbose_name='status', related_name='orders',
-                               on_delete=models.CASCADE)
+    # status = models.ForeignKey('commerce.OrderStatus', verbose_name='status', related_name='orders',
+    #                            on_delete=models.CASCADE)
     note = models.CharField('note', null=True, blank=True, max_length=255)
     ref_code = models.CharField('ref code', max_length=255)
     ordered = models.BooleanField('ordered')
@@ -59,9 +59,8 @@ class Order(Entity):
     @property
     def order_total(self):
         order_total = sum(
-            i.product.price_discounted * i.item_qty for i in self.items.all()
+            i.product.discounted_price * i.item_qty for i in self.items.all()
         )
-
         return order_total
 
 
