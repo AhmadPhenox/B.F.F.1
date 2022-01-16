@@ -3,7 +3,7 @@ from django.contrib import admin
 from commerce.models import (
     Product,
     Category,
-    Label, Item, ProductImage, Order,
+    Label, Item, ProductImage, Order, OrderStatus,
 
 )
 
@@ -13,6 +13,7 @@ admin.site.register(Label)
 admin.site.register(Category)
 admin.site.register(ProductImage)
 admin.site.register(Order)
+admin.site.register(OrderStatus)
 
 
 

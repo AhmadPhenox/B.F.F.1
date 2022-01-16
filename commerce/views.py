@@ -107,7 +107,7 @@ def add_to_cart(request, payload: AddToCartPayload):
         payload_validated.qty = 1
 
     try:
-        item = Item.objects.get(product_id=payload.product_id)
+        item = Item.objects.get(product_id=payload.product_id,user = user,ordered=False)
     except Item.DoesNotExist:
         Item.objects.create(product_id=payload.product_id, user=user, item_qty=payload_validated.qty,
                             ordered=False)
@@ -169,25 +169,25 @@ def generate_ref_code():
     return ''.join(random.sample(string.ascii_letters + string.digits, 6))
 
 
-@order_controller.post('create-order', auth=GlobalAuth(), response=MessageOut)
+@order_controller.post('create-order', auth=GlobalAuth(), response={201: MessageOut, 404: MessageOut})
 def create_order(request):
-
-
+    user = get_object_or_404(User, id=request.auth['pk'])
+    user_items = Item.objects.filter(user=user, ordered=False)
+    if not user_items:
+        return 404, {'detail': 'No items to make an order'}
     order_qs = Order.objects.create(
-        user = get_object_or_404(User, id=request.auth['pk']),
-        # status=OrderStatus.objects.get(is_default=True),
-
+        user=user,
+        status=OrderStatus.objects.get(is_default=True),
         ref_code=generate_ref_code(),
         ordered=False,
     )
 
     # ordered_user_items = Item.objects.filter(user=get_object_or_404(User, id=request.auth['pk'])).filter(ordered=True)
     # ordered_user_items.delete()
-    user_items = Item.objects.filter(user = get_object_or_404(User, id=request.auth['pk'])).filter(ordered=False)
-    user_items.delete(ordered=True)
+
     order_qs.items.add(*user_items)
     order_qs.total = order_qs.order_total
     user_items.update(ordered=True)
     order_qs.save()
 
-    return {'detail': 'order created successfully'}
+    return 201, {'detail': 'order created successfully'}
